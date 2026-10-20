@@ -1,0 +1,25 @@
+# Local measurements and downloaded third-party tools
+/runs/
+/tools/
+/firmware/
+
+# Secrets and machine-local settings
+.env
+.env.*
+!.env.example
+*.local.json
+.agents/
+.aws/
+.codex/
+
+# Build and editor artifacts
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+__pycache__/
+.venv/
+*.pyc
+*.user
+*.suo
