@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "mode": "legacy/manual",
+  "benchmark": "Cinebench R23 MC",
+  "entries": [
+    { "id": "ac90-dc90", "acMohm": 0.90, "dcMohm": 0.90, "score": 22877, "peakPackagePowerW": 172.98, "maxTemperatureC": 83 },
+    { "id": "ac80-dc90", "acMohm": 0.80, "dcMohm": 0.90, "score": 22720, "peakPackagePowerW": 170.70, "maxTemperatureC": 83 },
+    { "id": "ac65-dc90", "acMohm": 0.65, "dcMohm": 0.90, "score": 21921, "peakPackagePowerW": 158.44, "maxTemperatureC": 80 },
+    { "id": "ac60-dc90", "acMohm": 0.60, "dcMohm": 0.90, "score": 21703, "peakPackagePowerW": 151.86, "maxTemperatureC": 78 },
+    { "id": "ac55-dc90", "acMohm": 0.55, "dcMohm": 0.90, "score": 19134, "peakPackagePowerW": 141.99, "maxTemperatureC": 77 },
+    { "id": "ac50-dc90", "acMohm": 0.50, "dcMohm": 0.90, "score": 16889, "peakPackagePowerW": 132.43, "maxTemperatureC": 75 }
+  ]
+}

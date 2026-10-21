@@ -1,0 +1,14 @@
+<Project>
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../src/CpuLab.ProcessHost/CpuLab.ProcessHost.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../tests/CpuLab.ProcessProbe/CpuLab.ProcessProbe.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="CopyProcessHelpers" AfterTargets="Build">
+    <ItemGroup>
+      <HostFiles Include="$(MSBuildThisFileDirectory)../src/CpuLab.ProcessHost/bin/$(Configuration)/$(TargetFramework)/*" />
+      <ProbeFiles Include="$(MSBuildThisFileDirectory)../tests/CpuLab.ProcessProbe/bin/$(Configuration)/$(TargetFramework)/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(HostFiles)" DestinationFolder="$(OutDir)process-host" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ProbeFiles)" DestinationFolder="$(OutDir)process-probe" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

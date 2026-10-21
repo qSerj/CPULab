@@ -1,0 +1,63 @@
+# План CPU Lab после согласования архитектуры
+
+Согласовано пользователем 20.10.2026. Разрешена подготовительная разработка,
+тесты и инфраструктура на машине без стенда. Реальные стресс-тесты сюда не входят.
+
+## Готово локально
+
+- .NET 10 Core/CLI, контракты Inventory/Telemetry/Benchmark и HardwareProfile.
+- Детерминированный mock с baseline, тремя попытками, паузами и faults.
+- Непрерывные raw и CSV, per-attempt telemetry/stdout/stderr, schema v1, snapshots.
+- Частичный результат, отмена, per-attempt/total timeout, stale/temp policy в mock.
+- Recover незакрытой сессии без возобновления и выдумывания score/end.
+- Взвешенные по времени агрегаты, energy, coverage, score spread, comparison guard.
+- Автономный HTML-макет с графиками, provenance и отдельной legacy/manual таблицей.
+- Импорт шести исторических итогов, предварительные parser R23/7-Zip с фикстурами.
+- Автоматические тесты и CI workflow Linux/Windows. Удалённый CI пока не запускался.
+- Предварительный HWiNFO single-header CSV import: UTF-8/CP1251/1252,
+  явные dialect/UTC offset, raw + SHA-256, null для неизвестных значений,
+  отдельный автономный отчёт. Тесты на синтетических fixtures, без стендовой квалификации.
+- ProcessSupervisor/ProcessHost и лёгкий ProcessProbe: потоки, лимиты, отмена,
+  Linux process group, Windows Job Object с gate перед запуском target.
+  Linux-тесты пройдены; Windows execution pending. CLI `process-demo`.
+- `probe-series`: три лёгких процесса, adapter с проверкой fixture score,
+  общий журнал/HTML, provenance с SHA-256, частичный результат и recovery сессии.
+  Время реальное, score синтетический; сенсоры не подменяются mock-значениями.
+
+## Следующее, что можно делать без стенда
+
+1. Продолжить [HWiNFO CSV import](hwinfo-csv.md): квалификация реального экспорта,
+   динамические footer-заголовки, подтверждённый mapping метрик/единиц и временные
+   окна. Базовый поднабор с синтетическими fixtures реализован. JSON формат не угадывать.
+2. Проверить актуальные SHM headers и условия их использования; описать ABI,
+   lifetime/snapshot consistency, ID/instance/entry mapping. Если источника нет,
+   оставить задачу открытой, не строить unmanaged layout по чужому блогу.
+3. Windows-only Inventory: WMI/CPU Sets/CPUID с fixture-driven тестами mapping.
+   Изоляция от ядра позволяет Linux unit tests; реальные поля пока unknown.
+4. Исполнить supervisor/series-тесты на Windows; затем добавить адаптер согласованной
+   нагрузки и параллельную реальную телеметрию. Process-probe adapter уже связан
+   с общим журналом, отчётом и recovery сессии. Standalone process journal
+   пока не является самостоятельной recoverable сессией.
+5. Форма однократного ввода BIOS-полей/подхват прошлого с явным unconfirmed;
+   автоматический выбор совместимого baseline, warmup и полноценный replay.
+6. Консолидация схемы/валидации, migration story, recovery на повреждённых файлах,
+   показатели стоимости polling и storage; пользовательские сценарии и упаковка.
+
+## Что требует Windows, но не изменения BIOS
+
+- Права/driver availability, реальные WMI/CPUID/topology и версии компонентов.
+- Каталог HWiNFO, доступность per-core effective/flags и корректность SHM reads.
+- Квалификация R23 и 7-Zip на одном заранее согласованном ограниченном пакете:
+  stdout/stderr, locale, exit, длительность и границы работы, отмена дерева.
+- Проверка с Windows security settings как есть. Драйверы и политики не менять молча.
+
+## Что потребуется от владельца стенда позже
+
+Один preflight-экспорт сенсоров/инвентаризации и выбор доступного HWiNFO пути
+(free SHM или Pro). Перед настоящей нагрузкой — одно согласование пакета,
+временных лимитов и температурной политики. До этого ничего вручную на стенде
+делать не нужно, BIOS-перезагрузки для разработки не требуются.
+
+Перенос на B — только после разрешения владельца и подтверждения точной модели/BIOS.
+Разбор IFR необязателен и не блокирует измерительный MVP. CEP-диагноз остаётся unknown,
+пока не собраны согласованные наблюдения и не исключены другие ограничения.

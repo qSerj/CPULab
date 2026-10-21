@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>cpulab</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CpuLab.Core/CpuLab.Core.csproj" />
+  </ItemGroup>
+  <Import Project="../../build/ProcessHelpers.targets" />
+</Project>

@@ -11,6 +11,7 @@
 .agents/
 .aws/
 .codex/
+.serena/
 
 # Build and editor artifacts
 bin/
@@ -23,3 +24,4 @@ __pycache__/
 *.pyc
 *.user
 *.suo
+TestResults/

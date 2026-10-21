@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "synthetic-fixture",
+  "encoding": "utf-8",
+  "delimiter": ";",
+  "decimalSeparator": ",",
+  "dateFormat": "dd.MM.yyyy",
+  "timeFormat": "HH:mm:ss.fff",
+  "utcOffsetMinutes": 180,
+  "dateHeader": "Date",
+  "timeHeader": "Time",
+  "sourceVersion": "synthetic, not captured from HWiNFO",
+  "allowIncompleteFinalRecord": false
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "mode": "mock",
+  "name": "mock-demo",
+  "repeat": 3,
+  "baselineSamples": 3,
+  "cooldownSamples": 2,
+  "samplesPerAttempt": 10,
+  "sampleIntervalMs": 1000,
+  "attemptTimeoutMs": 15000,
+  "totalTimeoutMs": 120000,
+  "temperatureLimitC": 95,
+  "syntheticStartUtc": "2026-01-01T00:00:00Z",
+  "note": "Illustrative synthetic data. Neither stand A nor stand B was measured.",
+  "faults": {}
+}

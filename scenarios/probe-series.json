@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "mode": "process-probe",
+  "repeat": 3,
+  "pauseMs": 100,
+  "attemptTimeoutMs": 10000,
+  "totalTimeoutMs": 60000,
+  "failAttempt": 0,
+  "waitAttempt": 0,
+  "missingScoreAttempt": 0
+}
