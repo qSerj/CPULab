@@ -112,3 +112,23 @@ Windows cleanup во всех случаях windows-job-empty. Это пров�
 под нагрузкой. Prototype и его исходные результаты остаются в ignored runs/.
 Оператор отдельно запускал Cinebench вручную; балл и телеметрия этого прогона
 не получены. Агент автоматическую R23-серию до остановки из-за связи не запускал.
+
+
+### Первый реальный одиночный R23, 22.10.2026
+
+После изменения оператором сценария выполнен **один** R23 MC с пределом процесса
+90 s, TjMax-stop 100 °C и без power cutoff; baseline/post по 20 s. До старта
+прошли 8 новых синтетических guard fixtures и normal/timeout/cancel ProcessProbe
+в Windows, у всех cleanup=windows-job-empty.
+
+Результат: **21 797.56 R23 points** из нового stdout, exit 0, процесс 43.010 s,
+stderr empty, output не обрезан, cleanup windows-job-empty. HWiNFO и одноразовая
+задача убраны; аппаратные настройки/защиты не менялись. Получены 87 reads /
+44 уникальных polls, 7 начальных unavailable. В process window 21 poll:
+CPU Package max 79 °C, Package Power max 150.508 W. Статистики process window
+отделены от косвенного subset CPU Usage >=95%; точных render markers нет.
+
+Исходные логи и HTML/CSV/JSON сохранены приватно под runs/, хеши сверены.
+Это первое runtime-подтверждение конкретного R23 stdout, не квалификация всех
+вариантов формата и не проверка длительной стабильности. Ограничения ANSI reader
+и накопительных provider aggregates остаются; production adapter в CLI не добавлен.

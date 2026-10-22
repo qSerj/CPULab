@@ -750,3 +750,48 @@ Cinebench запускается напрямую через CreateProcess с п
 производитель платы. [Intel UVP](https://www.intel.com/content/www/us/en/support/articles/000094219/processors.html)
 различает BIOS и runtime undervolting; наличие меню не доказывает применение.
 Точные пункты/доступность на текущей B660 и BIOS ещё не квалифицированы.
+
+
+### Изменение согласованного пилота: один прогон, TjMax
+
+Оператор возобновил испытание и явно отменил порог 85 °C: для быстрого осмотра
+один завершённый R23 MC render, process timeout 90 s, baseline/post по 20 s,
+общий deadline 180 s. По [Intel ARK](https://www.intel.com/content/www/us/en/products/sku/134592/intel-core-i712700f-processor-25m-cache-up-to-4-90-ghz/specifications.html)
+проверено Tjunction / Max Operating Temperature **100 °C** для i7-12700F.
+Software stop перенесён на 100 °C, power stop снят. Это не изменение аппаратных
+лимитов: исходные настройки BIOS/защиты сохраняются. При утрате каналов или
+замершем provider poll >6 s нагрузка отменяется. Новые пороги сначала проверяются
+на лёгком ProcessProbe; реальные тяжёлые тесты не входят в qualification.
+
+
+Реальное исполнение обновлённого одиночного пилота 22.10:
+- Новые 8 guard fixture cases и normal/timeout/cancel ProcessProbe прошли на
+  Windows до нагрузки, cleanup windows-job-empty. После них выполнен один R23 MC
+  на исходных настройках: 23.200 / RBBenchmark330542, 20 threads, minimum duration=1.
+- Новый stdout: ровно `CB 21797.56 (0.00)`, exit 0, stderr empty,
+  stdout 10 633 bytes, не обрезан. Process lifecycle 43.010 s. Windows Job пуст
+  после завершения. Общий observer lifecycle 94.262 s, 87 reported reads,
+  44 уникальных HWiNFO polls, 7 начальных unavailable. Hardware settings не менялись.
+- TjMax-stop и timeout не сработали. После post-window наш HWiNFO закрыт,
+  одноразовая Interactive задача удалена, процессов Cinebench/HWiNFO не осталось.
+- В 21 уникальной выборке process window: CPU Package max 79 °C;
+  Package Power sample mean 122.792 W / max 150.508 W. Это включает подготовку,
+  поэтому среднее процесса не называется средней мощностью чистого рендера.
+- Косвенное high-CPU subset: внутри process window AND Total CPU Usage >=95%,
+  17 polls. Package Power mean 147.211 W, max 150.508 W; после переходного
+  первого high-CPU отсчёта значения около 149–150 W. Наблюдаемое 65 W plateau
+  в коротком опыте отсутствует. Температура к концу поднялась до 79 °C;
+  длительная установившаяся температура/стабильность этим не проверены.
+- Текущие Thermal Throttling / Power Limit Exceeded в сохранённых выборках =0;
+  IA: Max Turbo Limit=1. Последний не выдан за перегрев/CEP. Причины CEP не установлены.
+- Новые raw JSONL, полный CSV readings, автономный HTML и source hashes сохранены
+  в ignored runs/remote-access/r23-pilot-package; архив и каждый исходный файл
+  проверены SHA-256 после SFTP. Raw stdout содержит идентификаторы ОС/пути,
+  поэтому в Git не переносится. Этот результат квалифицирует только конкретное
+  первое исполнение/stdout, не все версии/локали парсера и не production adapter.
+
+Сравнение с legacy/manual 13600KF 22 877 points: -4.718% относительно исторического
+значения. Разные стенды/BIOS/сценарии и отсутствие старой синхронной телеметрии
+не позволяют выдать это за сравнение эффективности поколений. Пользователь
+считает срочный undervolt необязательным, интересуется 65–70 °C с теми же баллами;
+это будущая цель, не достигнутый результат. BIOS-настройки не изменялись.
