@@ -225,8 +225,10 @@ public sealed class JournalTests : IDisposable
         legacy.Validate();
         Assert.Equal(6, legacy.Entries.Length);
         Assert.All(legacy.Entries, e => Assert.False(e.RawAvailable));
-        using var store = RunStore.Create(root, Metadata() with { Mode = "legacy/manual", Status = "imported" }, null, [], legacy);
-        var data = RunStore.Read(store.DirectoryPath);
+        string directory;
+        using (var store = RunStore.Create(root, Metadata() with { Mode = "legacy/manual", Status = "imported" }, null, [], legacy))
+            directory = store.DirectoryPath;
+        var data = RunStore.Read(directory);
         Assert.Empty(data.Frames);
         Assert.Empty(data.Attempts);
         Assert.Null(Analyzer.Analyze(data).Series.Mean);
