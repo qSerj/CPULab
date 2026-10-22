@@ -500,3 +500,253 @@ status/result. Это готовый механизм интеграции, ко
 плате — разные проверки. Сообщение пользователя о вчерашней нехватке напряжений/
 частот не опровергается общей документацией и не считается решённым включением
 logging. Без исходного образца нельзя установить точную причину отсутствия.
+
+## 22.10.2026 — переносимый первый сбор на свежей Windows
+
+Для устранения ручного копирования команд выбран bootstrap из штатного Windows
+PowerShell 5.1/CIM, отдельно от .NET CLI. Это сбор inventory, не telemetry engine.
+
+| Источник | Версия / интерфейс | Лицензия / поставка | Ограничения | Проверка |
+|---|---|---|---|---|
+| [Get-CimInstance](https://learn.microsoft.com/en-us/powershell/module/cimcmdlets/get-ciminstance?view=powershell-5.1) | Windows PowerShell 5.1, локальный CIM/WMI; явный список свойств | Компонент Windows, не распространяется в пакете | Сведения провайдера ОС/SMBIOS, не независимая аппаратная аттестация; не даёт надёжных XMP, microcode, охлаждения и датчиков CPU | DOC 22.10; Windows execution pending |
+| [Compress-Archive](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.archive/compress-archive?view=powershell-5.1) | Microsoft.PowerShell.Archive, ZIP | Компонент Windows, не распространяется | Игнорирует hidden; файлы до 2 GiB, для маленьких JSON/HTML достаточно | DOC 22.10; Windows execution pending |
+
+Первоначально рассмотренная архитектура: START.cmd → локальные read-only CIM запросы →
+инкрементальный inventory.json → автономный report.html → ZIP с двумя файлами.
+Сбор без сети, elevation, SDK, изменения execution policy или аппаратных настроек.
+Allowlist исключает имя ПК/пользователя, serial, UUID, MAC, ключи ОС и пути.
+Ошибки источников сохраняются как статус/код, без произвольного текста с путями.
+Этот отдельный collector не реализован: пользователь предложил прямой SSH-доступ,
+который снимает необходимость пересылки inventory вручную.
+Поля, возвращённые прошивкой, могут быть неточными или содержать пользовательский
+текст: отчёт нужно просмотреть перед передачей. Это не гарантия анонимности.
+
+### SSH вместо ручного обмена
+
+Выбран штатный OpenSSH Server Windows, поддерживаемый Microsoft через Windows
+Update. Первоисточники проверены 22.10.2026:
+[установка](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse),
+[ключи и ACL](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement).
+Версия на целевом ПК unknown до подключения. Используется компонент ОС, сторонние
+бинарники не распространяются. Ключевая авторизация доступна локальным/доменным
+учётным записям, Entra ID не поддерживается. Для администраторов стандартная
+конфигурация использует ProgramData/ssh/administrators_authorized_keys с ACL
+SYSTEM/Administrators. Установка отсутствующего FoD может требовать интернет или
+совместимый офлайн-source. Подготовлен bootstrap с открытым ключом и LAN firewall
+rule; runtime на Windows, SSH и реальный inventory остаются HW pending.
+Контракт/план проверки: [windows-remote.md](windows-remote.md).
+
+### 22.10 — подтверждённый отказ Windows Update и офлайн MSI
+
+Оператор сообщил Add-WindowsCapability 0x8024402C на целевом Windows-ПК.
+[Microsoft](https://learn.microsoft.com/en-us/troubleshoot/windows-client/installing-updates-features-roles/error-0x8024402c-installing-update-feature-on-demand)
+определяет код как WU_E_PT_WINHTTP_NAME_NOT_RESOLVED: не разрешается имя
+целевого сервера/прокси. Конкретный DNS/proxy/WSUS виновник не установлен.
+Настройки DNS, proxy и политик обновления автоматически не меняем.
+
+Для пакета с накопителя исследован официальный Win32-OpenSSH MSI:
+[инструкция Microsoft](https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/upgrade-in-box-openssh-to-latest-openssh-release),
+[релиз 10.4.0.0p1-Preview](https://github.com/PowerShell/Win32-OpenSSH/releases/tag/10.4.0.0p1-Preview).
+MSI ADDLOCAL=Server регистрирует службу; установка не требует FoD/Windows Update.
+Это отдельная GitHub-сборка, **Preview / non-production ready**, не встроенная
+стабильная версия Windows; обслуживать обновления нужно отдельно. Сторонний код
+не меняется, исходные лицензии входят в дистрибутив; MSI хранится только в
+игнорируемых tools/ и runs/, в Git не добавляется. Выбран x64 для Intel стенда;
+на иной архитектуре установка должна отказать до MSI. SHA-256 издателя:
+788d8643464a01eb63640a2fd746f9ed23d106b5a901a35f88dc8cd40e446ac9.
+Bootstrap должен проверить этот hash и Authenticode Microsoft перед запуском MSI.
+Windows runtime/подпись на целевой машине ещё не проверены. При невалидной подписи
+или ограничениях политики установка останавливается, bypass не предусмотрен.
+
+### 22.10 — первые реальные фоновые счётчики Windows через SSH
+
+Использованы штатные CIM/Performance Counters, без нового sensor engine:
+[WMI Tasks: Performance Monitoring](https://learn.microsoft.com/en-us/windows/win32/wmisdk/wmi-tasks--performance-monitoring),
+[Collecting Performance Data](https://learn.microsoft.com/en-us/windows/win32/perfctrs/collecting-performance-data).
+Система Windows 11 build 22631, источник
+Win32_PerfFormattedData_Counters_ProcessorInformation, instance _Total.
+54 наблюдения за 120 с, запрошенный интервал 2 с, медианный фактический 2.281 с.
+Оригинальный JSONL, UTC, монотонные queryStart/queryEnd ticks и частота часов
+сохранены в игнорируемом runs/remote-access; получены CSV и автономный HTML.
+PercentProcessorTime и PercentProcessorUtility сохранены отдельно. ProcessorFrequency
+сообщал неизменно 2100 MHz; это показание ОС, не квалификация физического/effective
+clock. Температура, package power, VID/Vcore и аппаратные limit flags из этого
+источника не установлены; гипотез о CEP/перегреве по этой записи не делаем.
+Это фон с работающим сборщиком, не подтверждённый чистый idle или нагрузочный тест.
+
+Для Windows-квалификации лёгких ProcessProbe подготовлена managed-сборка .NET 10;
+SDK целевой ОС изначально отсутствует. Официальные источники установки и hash:
+[Windows installation](https://learn.microsoft.com/en-us/dotnet/core/install/windows),
+[.NET 10 release metadata](https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json).
+Выбран SDK 10.0.402 win-x64, установка /install /quiet /norestart; SHA-512 по
+каталогу Microsoft и Authenticode перед запуском. Эта подготовка не меняет
+аппаратные настройки и не устанавливает драйверы датчиков.
+
+Уточнение статуса: загрузка SDK 10.0.402 прервалась по timeout после 59 513 429
+из 215 626 112 байт. Частичный файл не проверен и не используется; SDK на Windows
+не установлен, ProcessProbe/Job Object тесты на Windows ещё не выполнены.
+Комплект инструментов найден в C:\Utils\Overclock: HWiNFO 7.72-5355,
+Cinebench 23.2.0.0, OCCT 12.1.14.99; Authenticode всех трёх — Valid.
+Запуска этих программ или драйверов датчиков не было.
+
+Итог Windows-квалификации 22.10: оператор установил SDK 10.0.401 / runtime 10.0.12.
+После исправления времени закрытия RunStore в legacy-тесте (не в CLI) пройдены
+87/87 на Linux и 87/87 на Windows. CLI process-demo и probe-series завершились;
+Windows Job cleanup подтверждён исходными process-result.json. Подробности:
+[validation.md](validation.md). Неудачная загрузка SDK 10.0.402 не использовалась.
+
+### Разрешённый мониторинговый пилот 22.10
+
+Оператор отдельно подтвердил запуск HWiNFO 8.54-6090 с его штатным драйвером
+на три минуты без нагрузки. Перед запуском: процессов HWiNFO64 нет, но
+HWiNFO_215 уже Running/Manual; этот существовавший драйвер не выгружаем.
+Используем отдельную копию portable EXE с проверенным ранее SHA-256, исходный
+каталог утилит не изменяем. Primary-сведения о настройках:
+[SensorsOnly=1, ответ автора](https://www.hwinfo.com/forum/threads/prevent-opening-main-window-when-open-sensor-window.6008/),
+[SensorsSM=1, ответ автора и 12-hour limit](https://hwinfo.com/forum/threads/settings-tab-not-opening.11030/).
+Shared Memory включается однократно для ограниченного пилота; автоматического
+сброса 12-часового ограничения и обхода Pro CLI нет. Текущий ABI официального
+header ещё не получен: запрещено выдавать декодирование по стороннему layout за
+подтверждённое. Допустимы только сырые снимки либо проверенный готовый consumer;
+возможности конкретного запуска ещё предстоит установить.
+
+Для пилота найден готовый consumer **Hwinfo.SharedMemory.Net 4.0.0** (NuGet,
+37 KB, net10.0-windows7.0, без зависимостей, MIT, автор Manfred Graf).
+[Репозиторий](https://github.com/Seraksab/Hwinfo.SharedMemory.Net),
+[пакет 4.0.0](https://www.nuget.org/packages/Hwinfo.SharedMemory.Net/4.0.0).
+Commit из nuspec: 5ba4fdc2aca7091d236398188214a48b91480561. Прочитаны исходники
+ReadingElements.cs, MappedSection.cs и SharedMemoryReader.cs этого commit:
+OpenExisting(Read), bounds checks, sensor/reading IDs, header recheck, mutex,
+UTC PollTime из unix seconds, никакого MSR/driver/network write API.
+Выбраны RequireMutex=true и ReuseUnchangedPolls=false. Старые ANSI/Latin1 поля
+декодируются библиотекой; поддержку новых UTF-8 расширений не утверждаем.
+Поддержка ABI делегируется этому consumer, это не аудит официального vendor header.
+Не переносим его unmanaged structs в ядро CPU Lab. Для пилота сохраняются все
+provider-объекты и отдельные непреобразованные SHM snapshots; лицензия reader
+сохраняется рядом со сборкой. Наличие каналов и runtime совместимость пока pending.
+
+Первая попытка пилота безопасно отклонена: обнаружен пользовательский HWiNFO,
+второй экземпляр не запускался. После закрытия того экземпляра: запуск через
+ProcessSupervisor дал start-failed, целевой PID отсутствует, Windows сообщает
+«Запрошенная операция требует повышения», cleanup windows-job-empty.
+Данные сенсоров не получены. Это elevation gate, а не доказательство блокировки
+драйвера. Политики/ACL/UAC не изменяем. Подготовлен локальный launcher со штатным
+Start-Process -Verb RunAs: оператор запускает его и подтверждает обычный UAC.
+Он использует отдельный новый output hwinfo-observation-b. Это продолжение того
+же уже разрешённого 180-секундного пилота; первый HWiNFO через SSH не стартовал.
+
+Повторный запуск collector через RunAs также дал 740. Диагностика 22.10:
+SSH WindowsPrincipal.IsInRole(Administrator)=true; у подписанного HWiNFO
+8.54-6090 (исходного и идентичной копии) manifest содержит
+`requireAdministrator` **и** `uiAccess=true`. ConsentPromptBehaviorAdmin=0:
+диалоги отключены, это не означает отсутствие UAC-механизма. Прямой
+CreateProcess путь ProcessHost не годится для этого экземпляра; проблема
+не доказывает блокировку драйвера. Не изменяем manifest, подпись, UAC или ACL.
+[Microsoft: CreateProcess и ShellExecute при elevation](https://learn.microsoft.com/en-us/windows/win32/dxtecharts/user-account-control-for-game-developers),
+[требования UIAccess](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-securityoverview).
+
+По просьбе оператора показывать окно на его рабочем столе подготовлен отдельный
+одноразовый **telemetry-only** пилот: Task Scheduler Interactive/Highest для уже
+вошедшего User (desktop session 2), обычный ShellExecute/RunAs HWiNFO, отдельный
+read-only observer на 180 секунд. Пароль не хранится, триггеров автозапуска нет;
+после завершения задача удаляется. GUI provider закрывается по сохранённому
+Process handle, а не поиском по имени; существующий экземпляр запрещает старт.
+Это экспериментальный GUI lifecycle, **не** квалификация containment/adapters:
+ProcessHost и его обязательный gate не изменены, запуск нагрузок этим путём
+не разрешён. Collector сохраняет исходные provider objects и opaque SHM;
+фактический результат отдельно фиксируется после выполнения.
+[Microsoft: Interactive principal](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal?view=windowsserver2025-ps).
+
+Результат интерактивного пилота: provider и wrapper реально в session 2,
+HWiNFO работал 12:00:24–12:03:26 UTC по часам Windows. Observer отработал
+180.018 s монотонного времени: 87 успешных уникальных polls, 3 начальных
+unavailable, 18 sensor groups / 437 readings; provider timestamps охватывают
+172 s. Декодированные объекты с исходными IDs, единицами, Value/Min/Max/Avg
+и timestamps сохранены в JSONL и CSV; SHA-256 JSONL/result совпал после SFTP.
+Тяжёлые нагрузки не запускались. Wrapper подтвердил owned-provider-exited,
+процессов HWiNFO после пилота нет, одноразовая задача удалена; ранее работавший
+HWiNFO_215 остаётся Running/Manual.
+
+Пилот **частично успешен**, не полная квалификация telemetry adapter:
+- Два opaque snapshot не записаны: view.Length превысил safety cap 16 MiB.
+  Стартовый отказ snapshot учтён как errors=1, финальный отдельной записью;
+  это не 1 отказ декодированного чтения. Лимит не повышался. Полного binary SHM
+  для независимой перепроверки ABI нет; сырые декодированные JSONL сохранены.
+- Consumer декодирует русские ANSI подписи/единицы как Latin1: mojibake.
+  Английские LabelOrig целы. В отчёте derived display-unit Latin1→CP1251
+  явно отделена от raw unit; исходные строки не переписаны.
+- Встречаются Value вне сообщаемого ValueMin/ValueMax; причина пока неизвестна.
+  Для окна пересчитаны extrema и среднее по Value уникальных provider polls,
+  а не использованы накопительные provider aggregates. В JSON отдельно оценка
+  среднего по трапециям на 172 s; интерполяция обозначена как оценка.
+- Статические PL1/PL2 4095 W — сообщение датчика, не измеренное потребление,
+  не доказанная настройка BIOS и не причина поведения. Не изменяли их.
+
+Измеренное в фоне: CPU Package DTS 25–43 °C, Enhanced 25–44 °C;
+CPU Package Power mean(Value)=4.665 W, max(Value)=29.549 W;
+Total CPU Usage mean(Value)=1.431%. Effective Clock, Vcore и VR VOUT
+присутствуют, но сам факт чтения не является калибровкой этих датчиков.
+Ненулевых текущих значений в 26 найденных Thermal Throttling / Power Limit
+Exceeded channels не наблюдалось — только в зарегистрированных выборках.
+Приватные исходники, отчёт и prototype остаются под ignored runs/; бинарники
+инструментов и reader в Git не добавлялись. Повторный пилот не запускался.
+
+### Подготовка первого R23 baseline 22.10
+
+По запросу оператора подготовить полезный реальный опыт: 3 последовательных R23
+MC single-pass кандидата (`g_CinebenchMinimumTestDuration=1`), жёсткий process
+limit 90 s, паузы 60 s, baseline/post по 20 s, общий предел 480 s. Это
+квалификация CLI/score и исходный baseline, а не воспроизведение старого стенда A.
+Проверена подписанная локальная 23.2.0.0 (SHA-256 сохранён), manifest asInvoker,
+uiAccess=false. Сам EXE не запускался при этой проверке. Документация Maxon
+22.10 по-прежнему подтверждает CLI, но относится к Cinebench 2026, поэтому
+точная семантика R23 и stdout до реального запуска остаются pending.
+
+Нагрузки — только существующий ProcessSupervisor с gate и Windows Job;
+проверку новой остановки сперва делать исключительно на лёгком ProcessProbe.
+Для нового пилота software abort при CPU Package >=85 °C, Package Power >=180 W,
+недоступных обязательных каналах или замершем timestamp >6 s. Это пороги
+программной реакции с задержкой опроса, а не аппаратные пределы или гарантия
+мгновенного ограничения температуры/мощности. Sensor IDs и raw units берутся
+из измеренного предыдущего пилота; бинарный SHM snapshot не обещается.
+При первом timeout/отсутствующем score/ошибке telemetry/cleanup серия прекращается.
+Cinebench запускается напрямую через CreateProcess с перенаправленными pipes;
+в отличие от командного cmd start parent здесь сам дожидается процесса.
+Работа stdout этой конкретной версии всё ещё требует runtime проверки.
+
+Оператор после описания трёх коротких прогонов разрешил «гонять как следует»
+и отрабатывать настройку; это разрешение на описанный ограниченный baseline.
+Изменений BIOS/напряжений/MSR или снятия защит это не разрешает.
+
+
+Статус на момент сохранения работы 22.10:
+- Подготовлен отдельный экспериментальный R23Pilot, **не часть CLI/MVP**.
+  Сборка .NET 10 прошла без ошибок/предупреждений. На Linux и Windows выполнены
+  7 синтетических guard cases, нормальный выход собственного ProcessProbe,
+  timeout и отмена по синтетическому перегреву. Во всех трёх Windows process
+  checks cleanup=windows-job-empty. Датчики/Cinebench этим не запускались.
+- Prototype source/package и журналы остаются локально в ignored
+  `runs/remote-access/r23-pilot-source` и `runs/remote-access/r23-pilot-package`;
+  копия пакета передана на стенд. Это не доставленный воспроизводимый адаптер
+  репозитория; в Git фиксируются только подготовка и статус квалификации.
+- До автоматической серии оператор самостоятельно запустил Cinebench для быстрой
+  оценки. Второй экземпляр и автоматическая серия не запускались. При последующей
+  проверке процесса уже не было; в каталоге cb_ranking найдены только старые
+  комплектные записи. Балл текущего CPU не получен; пользовательский прогон не
+  выдан за автоматический, окно/телеметрия для него не реконструированы.
+- Из-за ухудшения связи оператор попросил сохранить Git и push. Продолжение:
+  получить валидный новый R23 stdout/score, квалифицировать stop+telemetry совместно,
+  затем выполнить ограниченную серию. BIOS и аппаратные настройки не изменялись.
+
+Для следующего исследования: [Intel i7-12700F](https://www.intel.com/content/www/us/en/products/sku/134592/intel-core-i712700f-processor-25m-cache-up-to-4-90-ghz/specifications.html)
+указывает PBP 65 W / MTP 180 W; у
+[13600KF](https://www.intel.com/content/www/us/en/support/articles/000006047/processors.html)
+125 / 181 W. Это паспортные пределы, не фактическое потребление и не доказанная
+причина различия температур. Пользователь сначала сообщил <100 W в OCCT,
+затем уточнил, что под Cinebench процессор заметно греется. Режим OCCT, мощность
+и балл этого ручного R23 пока неизвестны. Нельзя объявлять 65 W cap установленным.
+[Intel о non-K](https://www.intel.com/content/www/us/en/support/articles/000094707.html):
+собственные undervolt controls/tools не предоставляются, BIOS options определяет
+производитель платы. [Intel UVP](https://www.intel.com/content/www/us/en/support/articles/000094219/processors.html)
+различает BIOS и runtime undervolting; наличие меню не доказывает применение.
+Точные пункты/доступность на текущей B660 и BIOS ещё не квалифицированы.

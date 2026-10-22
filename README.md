@@ -39,6 +39,8 @@ src/CpuLab.Cli -- --help`.
 
 ## Документация
 
+- [Единый каталог инструментов и правила транзита](docs/toolkit.md)
+- [Подключение свежего Windows-ПК по SSH](docs/windows-remote.md)
 - [Техническое задание](docs/Codex_CPU_Lab_TZ.md)
 - [Инструкции для агентов](AGENTS.md)
 - [Техническая разведка и первоисточники](docs/research.md)

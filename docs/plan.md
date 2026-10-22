@@ -24,7 +24,8 @@ BIOS-справочника и истории вариантов настрой�
   отдельный автономный отчёт. Тесты на синтетических fixtures, без стендовой квалификации.
 - ProcessSupervisor/ProcessHost и лёгкий ProcessProbe: потоки, лимиты, отмена,
   Linux process group, Windows Job Object с gate перед запуском target.
-  Linux-тесты пройдены; Windows execution pending. CLI `process-demo`.
+  Linux-тесты пройдены; Windows execution пройден 22.10 на одном дополнительном
+  стенде, включая CLI `process-demo`; подробности в [validation.md](validation.md).
 - `probe-series`: три лёгких процесса, adapter с проверкой fixture score,
   общий журнал/HTML, provenance с SHA-256, частичный результат и recovery сессии.
   Время реальное, score синтетический; сенсоры не подменяются mock-значениями.
@@ -39,7 +40,8 @@ BIOS-справочника и истории вариантов настрой�
    оставить задачу открытой, не строить unmanaged layout по чужому блогу.
 3. Windows-only Inventory: WMI/CPU Sets/CPUID с fixture-driven тестами mapping.
    Изоляция от ядра позволяет Linux unit tests; реальные поля пока unknown.
-4. Исполнить supervisor/series-тесты на Windows; затем добавить адаптер согласованной
+4. Supervisor/series-тесты и CLI исполнены на Windows 22.10 (87/87 всего);
+   далее добавить адаптер согласованной
    нагрузки и параллельную реальную телеметрию. Process-probe adapter уже связан
    с общим журналом, отчётом и recovery сессии. Standalone process journal
    пока не является самостоятельной recoverable сессией.
