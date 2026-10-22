@@ -39,6 +39,8 @@ src/CpuLab.Cli -- --help`.
 
 ## Документация
 
+- [Продолжение разговора на другом компьютере](docs/continuation.md)
+- [Журнал обсуждений и решений](docs/discussions/README.md)
 - [Единый каталог инструментов и правила транзита](docs/toolkit.md)
 - [Подключение свежего Windows-ПК по SSH](docs/windows-remote.md)
 - [Техническое задание](docs/Codex_CPU_Lab_TZ.md)
