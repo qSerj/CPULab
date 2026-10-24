@@ -795,3 +795,510 @@ Software stop перенесён на 100 °C, power stop снят. Это не 
 не позволяют выдать это за сравнение эффективности поколений. Пользователь
 считает срочный undervolt необязательным, интересуется 65–70 °C с теми же баллами;
 это будущая цель, не достигнутый результат. BIOS-настройки не изменялись.
+
+### Возврат к управлению питанием 12700F — 23.10.2026
+
+Повторно проверены первоисточники (документация, не программные зависимости;
+лицензии на включение стороннего кода здесь не требуются):
+- [Intel ARK 12700F](https://www.intel.com/content/www/us/en/products/sku/134592/intel-core-i712700f-processor-25m-cache-up-to-4-90-ghz/specifications.html):
+  PBP 65 W, MTP 180 W. Это не измерение активных настроек платы.
+- [Intel Package Power Control, ID 655258, редакция 001](https://edc.intel.com/content/www/us/en/design/ipla/software-development-platforms/client/platforms/alder-lake-desktop/12th-generation-intel-core-processors-datasheet-volume-1-of-2/001/package-power-control/):
+  PL1 ограничивает среднюю мощность, PL2 управляет более быстрым ограничением
+  превышений, Tau — постоянная усреднения EWMA для PL1, а не точный таймер
+  «турбо включено N секунд». Открытая редакция архивная; источник описывает
+  механизм, но не доказывает поведение конкретного BIOS.
+- [Intel non-K, статья 000094707](https://www.intel.com/content/www/us/en/support/articles/000094707.html):
+  Intel не предоставляет собственных undervolt controls/tools для locked non-K;
+  BIOS options определяет производитель. Статья общая, не квалификация 12700F.
+- [Intel UVP, статья 000094219](https://www.intel.com/content/www/us/en/support/articles/000094219/processors.html):
+  BIOS и runtime управление различаются; наличие пункта не гарантирует применение
+  отрицательного offset. Сочетание платы, CPU, BIOS и защит ещё требует проверки.
+
+Предложенное направление: сначала карта PL1/PL2/Tau и напряжения конкретного BIOS.
+Ограничение мощности может снижать частоту и балл; сохранение балла при меньшей
+мощности посредством undervolt пока гипотеза. Новых испытаний не выполнялось.
+
+Уточнение после вопроса пользователя «И какой ответ на этот вопрос?»:
+работоспособность undervolt на текущем BIOS **не установлена**, отрицательный
+результат также не доказан. В локальном workspace каталога firmware нет.
+На проверенной [официальной странице поддержки платы](https://www.gigabyte.com/Motherboard/B660-DS3H-DDR4-rev-10-11/Support)
+есть F20, но точная наблюдавшаяся строка версии в списке отсутствует. Поэтому
+исследование опубликованного F20 нельзя выдавать за анализ установленного BIOS.
+Официальные release notes не дали подтверждения применимости undervolt.
+
+### Подготовка анализа официального F36 — 23.10.2026
+
+Пользователь предложил обновить BIOS и исследовать тот же опубликованный файл;
+ревизию платы уточнил как **rev. 1.0**. Это пользовательское уточнение, не CIM:
+в исходной инвентаризации поле ревизии было x.x. Обновление пока не выполнялось.
+
+[Официальная поддержка rev. 1.0/1.1](https://www.gigabyte.com/Motherboard/B660-DS3H-DDR4-rev-10-11/Support):
+последняя опубликованная версия при проверке — F36, 29.09.2026, checksum 982A.
+В changelog: CPU microcode M32B0671_00000137, подготовка поддержки будущих CPU.
+Это не подтверждает изменение микрокода именно Alder Lake.
+В предшествующей F36a исправлялась видимость VccSA для 12-го поколения;
+VccSA не равен Vcore. В истории F24 заявлена поддержка BIOS Settings в HWiNFO64
+7.6+, F30 — Intel Default Settings по умолчанию, F33/F34 меняли защитные defaults.
+Поэтому обновление не следует считать сохранением прежней конфигурации питания.
+Файл для анализа: [официальный ZIP F36](https://download.gigabyte.com/FileList/BIOS/mb_bios_b660-ds3h-ddr4_8aadl079_f36.zip).
+
+Готовые инструменты выбраны до анализа, собственный парсер не создаётся:
+- [UEFITool/UEFIExtract A75](https://github.com/LongSoft/UEFITool/releases/tag/A75),
+  BSD-2-Clause, CLI для извлечения дерева UEFI и декомпрессии секций.
+  Linux ZIP SHA-256 5ee05d0da0c235626de67959d6cd97767e0d7ac67d42c8839e5972e8c23fd5a5.
+- [IFRExtractor-RS 1.6.1](https://github.com/LongSoft/IFRExtractor-RS/releases/tag/v1.6.1),
+  BSD-2-Clause, CLI для извлечения HII/IFR форм и строк из бинарных модулей.
+  Linux ZIP SHA-256 5a18e253e560270387657d0165f317d7319cf6296cd5e58b1f13074557514c57.
+
+Оба архива скачаны из релизов разработчиков, SHA-256 совпали с GitHub release
+metadata, CLI help реально выполнен. Бинарники под ignored tools/uefi.
+Ограничение: IFR показывает описание меню, условия и defaults в образе,
+но не доказывает доступность на 12700F и применение напряжений в железе.
+
+F36 полностью скачан, ZIP integrity проверена, образ разобран UEFIExtract и
+IFRExtractor; первичная [карта настроек и условий](bios-b660-f36.md) сохранена.
+Найдены DVID, профили AC/DC (включая Power Saving), отдельные IA AC/DC,
+PL1/PL2/Time и UVP. Установлены конкретные условия скрытия/GrayOut; служебные
+capability flags пока не расшифрованы по исполняемому коду и не считаны на CPU.
+Наличие пунктов не выдано за работающий undervolt. Обновление платы не выполнено.
+
+Для объяснения пользователю проверена [Intel 12th Gen datasheet rev. 011](https://cdrdv2-public.intel.com/655258/655258-011.pdf):
+§13.1.3 — VID и voltage regulator, стр. 180 (PDF index) — примечание о прямом
+влиянии BIOS DC Load Line на power measurements. Различать AC-компенсацию
+запроса напряжения, DC-модель для учёта и фактическую loadline регулятора/LLC.
+VCCIN_AUX документирован отдельно от VccCORE; назначение всех кратких
+vendor-имён вроде VCC1P05 по одному имени не установлено. В F36 help относит
+V0P82 PCH и VCC1V8P к PCH; у V1P8 CPU и VCC1P05 содержательного help нет.
+
+### Ручной R23 после предложенного DVID -25 mV — 23.10.2026
+
+Пользователь сообщил **21 720 points** и указал log рядом с HWiNFO. По разрешённому
+SSH/SFTP получен исходный log.CSV; копия остаётся в ignored
+`runs/remote-access/dvid-20261023/manual/`. Размер 390 889 bytes, SHA-256 источника
+и копии совпали: `c80f1bdd3b5615b4c443a27ae3d977b99503f749d21f0838c60f955266d6fd6d`.
+Балл — сообщённый оператором, нового R23 stdout нет. Это ручной прогон;
+автоматический ProcessSupervisor не управлял его длительностью и остановкой.
+
+CSV UTF-8 BOM, comma delimiter, dot decimals, 477 columns, 131 data rows;
+в конце повтор заголовка и строка групп датчиков. Эти строки отделены явно;
+исходный файл не переписывался. Clock CSV 13:37:04.552–13:41:20.723 23.10.2026;
+timezone внутри CSV не закодирован, UTC не восстановлен. High CPU по столбцу 84
+Total CPU Usage >=95%: 87 строк, 13:37:40.606–13:40:38.678, span 178.072 s
+с промежуточными провалами. Это около трёх минут, не согласованные максимум 90 s;
+не называть опыт автоматически ограниченным. Маркеров процесса/рендера нет.
+
+Сравнение с baseline: первые 32 s high-CPU, по 17 отсчётов. Для сравнения плато
+отдельно исключён первый переходный отсчёт с обеих сторон (по 16 точек):
+- Package Power: **149.519 → 146.044 W** (около -3.47 W / -2.32%).
+- ITE IT8689E Vcore: **1.18575 → 1.16025 V** (около -25.5 mV).
+- OnSemi NCP81530 VR VOUT: **1.29219 → 1.26437 V** (около -27.8 mV).
+- Effective Clock по 17 точкам: **4367.35 → 4366.31 MHz**.
+- Package max на первых 32 s: **79 → 75 °C**; весь новый более длинный опыт
+  max **84 °C**, high-CPU mean power **146.531 W**. Сопоставлять 84 и 79 как
+  эффект настройки нельзя: разный прогрев, температура воздуха не зафиксирована.
+- Балл **21797.56 → 21720** (-0.3558%). Один опыт не устанавливает разброс.
+
+Два канала напряжения согласуются с действием DVID. Core VID практически прежний
+(mean первых 32 s 1.15218 → 1.15318 V), IA Voltage Offset всё время **0.000 V**.
+Не объявлять DVID неработающим по offset или VID; каналы не калиброваны и не
+взаимозаменяемы. CSV mapping — по заголовкам и footer-группам, аппаратных IDs
+в native CSV нет; они имеются в старом SHM JSONL. Средние арифметические по
+записанным отсчётам, не энергия и не точное окно рендера.
+
+Thermal/power-limit flags в CSV — No/Нет, WHEA Total Errors=0 во всех строках.
+IA Max Turbo Limit и RING Max VR Voltage/ICCmax/PL4=Yes; составной флаг не
+доказывает конкретную причину или CEP. WHEA Event Log не проверялся, долгосрочная
+стабильность не установлена. Исходник, код анализа и analysis.json сохранены
+локально. Новых нагрузок или настроек агент не запускал.
+
+### Ручной опыт DVID -100 mV — 23.10.2026
+
+Оператор сообщил **R23 9656 points**, меньше тепла/мощности, и разрешил забрать
+лог в том же каталоге. Новый CSV сохранён отдельно в ignored
+`runs/remote-access/dvid-20261023/minus100/`; 490 290 bytes, SHA-256 источника
+и копии совпал: `6a6dc6c0cb82b443f750eda63653b6db210379966d036c53a479a468f47476b5`.
+Те же 477 заголовков/групп, 172 data rows, корректно отделённый footer.
+Балл введён оператором, нового stdout/точных process markers нет.
+
+CSV clock 13:56:23.523–14:02:03.621; зона в CSV не закодирована. High CPU >=95%
+117 строк, span240.069 s (13:56:39.515–14:00:39.584), около четырёх минут.
+Это ручной опыт, автоматического ограничения до90 s здесь не было.
+Сравнение средних всех high-CPU отсчётов -25 → -100 mV:
+- R23 **21720 → 9656**, **-55.543%**.
+- Package Power **146.531 → 97.115 W**, max нового 98.428 W.
+- ITE Vcore **1.16359 → 1.11374 V**.
+- NCP81530 VR VOUT **1.26868 → 1.17983 V**.
+- Max CPU Package нового опыта DTS60 / Enhanced61 °C.
+- Обычные P-core clocks около4489 MHz, E-core около3392 MHz в обоих опытах.
+- P-core Effective Clocks остаются около4490 MHz; E-core Effective Clocks
+  на всех четырёх ядрах **около3376 → 1696 MHz**. Нельзя утверждать обвал
+  эффективной частоты всех ядер; одно падение E-core не объясняет весь score loss.
+- Core VID **1.15741 → 1.19270 V**, то есть запрос повысился, несмотря на снижение
+  показаний Vcore/VOUT. IA Voltage Offset всё ещё **0.000 V** во всех строках.
+- Thermal/power-limit flags No/Нет, WHEA counter0; IA Max Turbo Limit и составной
+  RING Max VR Voltage/ICCmax/PL4 отмечены Yes и в предыдущем -25 mV опыте.
+
+Новая выраженная реакция существенно усиливает вывод о действии DVID на этой
+связке. Сдвиг напряжения первого -25 mV согласуется с ним; точная экономия 3.5 W
+всё ещё не отделена от разброса контрольным возвратом. Канал IA Offset здесь
+не отражает заданный DVID, но точный register/backend HWiNFO и реализация DVID
+платы не установлены. Коррекция на стороне VRM — объясняющая гипотеза,
+не результат дизассемблирования. Ноль offset не доказывает отсутствие эффекта.
+
+Сильная потеря результата при меньшей мощности и сохранении обычных clocks
+совместима с внутренним throttling/clock stretching; CEP — рабочая гипотеза,
+не установленная причина. [Intel CEP, datasheet следующего поколения](https://cdrdv2-public.intel.com/743844/743844-015.pdf)
+§13.1.5 описывает внутреннее ограничение тока/мощности при падении напряжения
+ниже VTRIP. Это первоисточник для механизма, не прямая квалификация 12700F.
+CEP и защиты не менялись. Агент нового теста не запускал.
+
+### Автоматический одиночный R23 при DVID -50 mV — 23.10.2026
+
+Оператор сообщил установку -0.050 V и явно разрешил изменение ExecutionPolicy.
+Использован `powershell -ExecutionPolicy RemoteSigned -File ...` только для
+отдельных процессов. LocalMachine/CurrentUser не менялись. В финальном новом
+обычном PowerShell фактически получено `Restricted`. Это новая явная авторизация
+после прежнего auto-review отказа, а не продолжение неразрешённого обхода.
+
+Первая подготовка: новая сборка runner90 °C,8 guard cases + Windows ProcessProbe
+normal/timeout/cancel прошли, cleanup windows-job-empty. Первая реальная попытка
+**остановилась до нагрузки**: HWiNFO вернул пустые Readings и timestamp UnixEpoch;
+runner завершился mandatory-channel-or-unit-unavailable, attempts=[]. Owned HWiNFO
+закрыт. Это инициализация SHM, не доказанная неисправность обязательных датчиков.
+
+Исправлен только ignored prototype: пустая SHM до первого валидного frame
+ожидается в пределах прежнего startup deadline15 s; непустые данные проходят
+прежнюю проверку ID/unit, потеря каналов после валидного frame по-прежнему
+останавливает тест. Ни gate, ни Job, ни пороги не ослаблялись. Сборка без ошибок
+и предупреждений. На Windows прошли **12 guards** (включая deadline и запрет
+маскировать пустоту после первого frame), normal/timeout/cancel ProcessProbe;
+все три cleanup windows-job-empty. Production CLI этим не изменён.
+
+Новая DLL SHA-256 `A0A1ADCB4940C3DC4A714F8E323142CE2FE5D63A00C52186E33DC4B1F6ED5DC3`.
+Точные исходники/пакеты под ignored `runs/remote-access/r23-dvid-ready-source/`
+и `runs/remote-access/dvid-20261023/`. Перед нагрузкой сверены hashes и passed
+qualification, отсутствие существующих HWiNFO/Cinebench. Одноразовая Interactive
+task, HWiNFO через owned handle, R23 через ProcessSupervisor с gate/Windows Job.
+
+Выполнен **один** R23 MC: stdout **CB 17012.05 (0.00)**, exit0, stderr0 bytes,
+stdout10903 bytes, без truncation; process61.2569 s, cleanup windows-job-empty.
+Процесс 14:17:18.871–14:18:20.128 Europe/Moscow (конверсия сохранённых UTC).
+Observer lifecycle111.544 s,105 reported reads,53 уникальных непустых polls,
+6 initial unavailable. План: baseline/post20 s, process timeout90 s,
+total deadline180 s, software stop90 °C, stale poll6 s, без power cutoff.
+Timeout и temperature stop не сработали. Hardware settings агент не менял.
+
+На high-CPU subset (внутри process lifecycle AND Total CPU Usage>=95%)22 polls
+с размахом42 s:
+- Package Power mean **125.560 W**, max **131.082 W**; первое переходное значение
+  66.515 W. Без первого значения21 poll: **128.372 W**, диапазон125.962–131.082 W.
+- CPU Package DTS/Enhanced max **72 °C**, включая process window.
+- ITE Vcore mean **1.14545 V**, NCP81530 VR VOUT mean **1.23750 V**.
+- P0 Effective Clock mean **4490.11 MHz** при обычной4489.07 MHz;
+  E8 Effective Clock mean **2400.60 MHz** (2226.63–2585.88) при обычной3391.74 MHz.
+  IA Voltage Offset=0. Отдельные каналы/виды усреднения не смешиваются.
+- В process samples thermal/power-limit/PROCHOT=0, WHEA Total Errors=0,
+  IA Max Turbo Limit=1. Это не полная проверка стабильности или доказательство CEP.
+
+Score **-21.954%** к исходному21797.56; -50 mV уже даёт существенную потерю
+производительности. Номинальные clocks сохраняются, E-core effective падает;
+точный механизм/роль CEP не установлены. Значения температур разной длительности
+не считать чистым эффектом offset. Дальнейшие BIOS-настройки не изменялись.
+
+Обе одноразовые задачи удалены, owned-provider-exited, wrapper error=null;
+финальная проверка процессов не нашла HWiNFO/Cinebench. Результаты в ignored
+`runs/remote-access/dvid-20261023/minus50-verified/`: исходные JSONL/stdout,
+analysis.json, readings.csv (экспорт из SHM, не native HWiNFO CSV) и автономный
+report.html. ZIP SHA-256 **956968ECE1AF76B33EF07A408D421F07430AA6D96EA145F1D06BC906435B586E**
+и все20 исходных файлов сверены с remote manifest. Имена путей ZIP нормализованы
+из Windows separators при извлечении; содержимое файлов не изменялось.
+
+### Контрольный возврат DVID -25 mV — 23.10.2026
+
+Оператор сообщил установку -0.025 V и явно попросил тестировать. Выполнен
+один R23 тем же квалифицированным runner (SHA-256 A0A1ADCB…F6ED5DC3), без
+изменения его исходников/порогов. Новая одноразовая Interactive task и новый
+каталог исключили перезапись предыдущих опытов. Проверены hash, passed
+qualification и отсутствие конкурирующих HWiNFO/Cinebench; ProcessSupervisor,
+gate и Windows Job прежние. RemoteSigned только в процессах, с прежней
+явной авторизацией пользователя; новых BIOS-настроек агент не делал.
+
+Результат из реального stdout: **CB 21750.96 (0.00)**, exit0, stderr empty,
+stdout10633 bytes без truncation. Процесс47.2278 s, cleanup windows-job-empty,
+14:28:55.487–14:29:42.715 Europe/Moscow. Observer96.4993 s,91 reported reads,
+46 уникальных непустых polls,5 initial unavailable. Прежние пределы90 s/90 °C
+не достигнуты. В high-CPU subset17 polls/span32 s:
+- CPU Package Power mean143.775 W с первым переходным102.276 W;
+  без первого отсчёта16 polls **146.369 W**, диапазон145.484–147.108 W.
+- CPU Package max **80 °C**; заметного выигрыша температуры относительно
+  старого короткого baseline79 °C этот контроль не показал.
+- ITE Vcore mean **1.16329 V**, NCP81530 VR VOUT **1.26735 V**.
+- P0 Effective **4490.07 MHz**, E8 Effective **3376.20 MHz** при обычной3391.8 MHz;
+  средний Effective Clock4366.41 MHz. IA Voltage Offset по-прежнему0.
+- В process samples thermal/power-limit/PROCHOT=0, WHEA Total Errors=0;
+  IA Max Turbo Limit=1. Короткий контроль не доказывает длительную стабильность.
+
+Score **-0.2138%** к baseline21797.56, **+0.1425%** к первому операторскому
+результату21720 на -25 mV. Возврат восстановил быстродействие после17012.05
+на -50 и9656 на -100 mV; это усиливает причинную связь изменения DVID с потерей
+производительности, но не устанавливает конкретный механизм CEP.
+Сопоставимое плато исходного Auto149.519 W и возврата146.369 W отличается
+примерно на3.15 W, показания напряжений — примерно на25 mV; условия воздуха
+не контролировались, физические датчики не калиброваны.
+
+Owned HWiNFO закрыт, wrapper error=null, задача удалена, финально процессов
+HWiNFO/Cinebench нет; новый обычный PowerShell=Restricted. Сохранены исходные
+JSONL/stdout, анализ, CSV-экспорт из SHM и автономный report.html в ignored
+`runs/remote-access/dvid-20261023/return25-verified/`. ZIP SHA-256
+**42F2AB4E196347814D415323AE5B4E1E3BBA001C91B400D3CA267685605BE82C**
+и все20 исходных файлов сверены с remote manifest. Текущее сообщённое оператором
+состояние — DVID -25 mV. Новых тестов после контроля не запускалось.
+
+### CPU Internal AC/DC Loadline=Power Saving, DVID=Auto — 23.10.2026
+
+Пользователь сообщил включение Power Saving и отдельно подтвердил возврат
+DVID на Auto. Агент выполнил **один** R23 MC тем же квалифицированным runner,
+gate/Windows Job,90 s process timeout /90 °C software stop, baseline/post20 s.
+Перед стартом проверены прежние hashes/qualification и отсутствие конкурирующих
+процессов. Новая одноразовая Interactive task, RemoteSigned только в процессах.
+Настройки CPU агент не менял; фактические численные AC/DC профиля неизвестны.
+CPU Vcore mode повторно не уточнялся; не приписывать ему новое значение.
+
+В бинарном runner plan.kind остался старый текст «DVID -25 mV»; это метка,
+не чтение BIOS. Raw plan сохранён без исправления, несоответствие явно отражено
+в operator-settings.json и analysis.json. Операторские настройки данного опыта
+берутся из отдельной записи, не из этого унаследованного kind.
+
+Результат stdout: **CB 12199.54 (0.00)**, exit0, stderr empty, stdout11389 bytes,
+без truncation. **-44.0325%** к Auto21797.56. Процесс76.2079 s,
+14:42:25.819–14:43:42.027 Europe/Moscow, cleanup windows-job-empty.
+Observer125.4541 s,120 reported reads,61 уникальный непустой poll,
+5 initial unavailable. Таймаут/температурная остановка не сработали.
+
+High CPU subset31 poll/span60 s, средние по Value:
+- Сообщаемая CPU Package Power **104.834 W**, min102.320/max105.712 W.
+  SVID POUT mean104 W; VR IOUT mean80.16 A. Из-за возможного изменения DC LL
+  разницу Package Power не считать точным независимым измерением экономии.
+- CPU Package max **66 °C** по DTS/Enhanced в high-CPU subset.
+- ITE Vcore **1.13690 V**, NCP81530 VR VOUT **1.21226 V**.
+- P0 Effective **4490.10 MHz** при обычной4489.05 MHz;
+  E8 Effective **1726.28 MHz** (1709.50–1741.64) при обычной3391.73 MHz.
+- Средний Effective Clock4183.10 MHz, IA Voltage Offset=0.
+- В process samples thermal/power-limit/PROCHOT=0, WHEA Total Errors=0,
+  IA Max Turbo Limit=1, RING Max VR Voltage/ICCmax/PL4=1. Последний составной
+  флаг не доказывает CEP или конкретный лимит, полная причина потери баллов
+  остаётся неизвестной. Короткий опыт не проверяет длительную стабильность.
+
+Power Saving не достиг цели сохранения производительности. По сообщённым
+настройкам и наблюдаемой реакции он существенно меняет поведение системы,
+но его численная конфигурация и точный механизм эффекта не установлены.
+Рекомендован возврат Internal AC/DC на Auto с DVID Auto; этот возврат агент
+не выполнял и пользователь пока не подтвердил.
+
+Owned HWiNFO закрыт, wrapper error=null, задача удалена, процессов теста нет.
+Новый обычный PowerShell=Restricted; постоянные политики не менялись.
+Архив SHA-256 **9885A9FE528A1B88156311531C194AD079CCA4C2533F707FDFBA8CA500BE836E**
+и все21 исходный файл сверены с remote manifest. Данные/analysis.json/экспорт
+CSV из SHM/автономный report.html в ignored
+`runs/remote-access/powersaving-20261023/verified/`. Новых нагрузок после этого нет.
+
+### Пересмотр стратегии после замечания оператора — 23.10.2026
+
+Пользователь ожидал обоснованную документацией стратегию и указал, что возврат
+после каждого провала не является достаточным планом. Замечание принято:
+Power Saving выбран без установленных численных AC/DC, риск сильной потери
+результата на non-K следовало исследовать до опыта. Обнаруженные описания меню
+и общие механизмы не квалифицируют рабочий undervolt на конкретной старой BIOS.
+
+Дополнительно проверены первоисточники:
+- [MSI, 08.03.2024, матрица отключения CEP](https://www.msi.com/news/detail/Stay-Cool-and-Perform-Better--MSI-BIOS-Update-Allows-to-Disable-CEP-Function-for-Intel-14th-Gen-Processors-143359):
+  12th Gen non-K — No для Z790/Z690 и B760/B660. Это сведения MSI на дату
+  публикации, не проверка Gigabyte или актуального CPU микрокода, но оснований
+  обещать работающее отключение CEP на 12700F/B660 не дают. Источник описывает
+  потерю производительности при снижении напряжения; причина нашего cliff
+  по-прежнему не установлена. Защиты автоматически не менять.
+- [Intel Package Power Control, ID655258, rev001](https://edc.intel.com/content/www/us/en/design/ipla/software-development-platforms/client/platforms/alder-lake-desktop/12th-generation-intel-core-processors-datasheet-volume-1-of-2/001/package-power-control/):
+  PL1 average-power threshold, PL2 rapid limiting threshold, Tau EWMA constant.
+- [Gigabyte Intel600 BIOS guide, китайская редакция v2, стр13](https://download.gigabyte.com/FileList/Manual/mb_manual_600series-bios_sc_v2.pdf):
+  Turbo Power Limits управляет ограничением через снижение core frequency,
+  ручные значения открываются при Enabled. Это generic guide, не чтение текущего
+  BIOS пользователя. Имена PL подтверждены ранее самим оператором и IFR F36.
+
+Новая предложенная практическая стратегия: вернуть только изменённые нами
+настройки напряжения (DVID, Internal AC/DC, CPU Vcore/Mode при изменении) на
+исходные Auto; не выполнять Load Optimized Defaults и не трогать память/загрузку.
+Прекратить перебор неизвестных профилей и большего отрицательного DVID.
+Следующий отдельный опыт — **PL1=PL2=125 W**, Tau/ток/LLC/CEP прочее исходное.
+125 W — выбранный пробный бюджет (примерно -17% к наблюдавшимся150 W),
+не гарантия температуры или сохранения баллов и не предписание Intel для12700F.
+Предложенный рабочий критерий: сохранить не менее95% исходного R23 (~20.7k)
+при реальном срабатывании power limit и снижении мощности; это предложение ИИ,
+не уже согласованный пользователем допуск потери. Если цена больше — один
+корректирующий опыт140 W и завершить практический подбор. Контролировать
+Package Power, power-limit flags, P/E effective clocks, результат и температуру
+в том же окне; не интерпретировать PL2 как запрет любых мгновенных выбросов.
+Тест пока не запускался и значения не установлены.
+
+Дальнейшее исследование undervolt отдельно: установить активные AC/DC,
+микрокод/stepping и применимость управления CEP на текущей связке до новых
+экспериментов с напряжением. Даже успех PL не обещает65–70 °C при том же балле;
+если быстродействие требуется без уступок, отдельно исследовать охлаждение.
+
+### Первый опыт PL1=PL2=125 W — 23.10.2026
+
+Пользователь согласился на план125 W и приемлемую потерю производительности,
+затем попросил продолжить. До нагрузки добавлена проверка статических лимитов
+HWiNFO: отсутствующие/нечисловые/отличные от125 W PL1/PL2 запрещают старт.
+Отдельный ignored PL125 runner собран без ошибок/предупреждений;17 guard cases
+(включая5 новых проверок лимитов) и Windows ProcessProbe normal/timeout/cancel
+прошли, все cleanup windows-job-empty. Никаких изменений gate/Job или90 s/90 °C.
+Runner SHA-256 **511E6A208158392DCCE7694A4EA47922C76ED27C390D157E1D09738938BA754E**.
+
+Preflight после3 свежих polls: PL1=125 / PL2=125 W. Этот отчёт датчика
+не выдаётся за независимое MSR-чтение. Auto для DVID/ACDC/CPU Vcore было
+частью согласованного плана, но отдельно аппаратно не считано. Сведения о
+requested settings и ограничении проверки сохранены в operator-settings.json.
+
+Выполнен **один** R23 MC: реальный stdout **CB 20799.10 (0.00)**, exit0,
+stderr empty, stdout10687 bytes без truncation. Процесс50.0765 s,
+16:34:29.267–16:35:19.343 Europe/Moscow, cleanup windows-job-empty.
+Observer99.4284 s,94 reported reads,47 уникальных непустых polls,
+5 initial unavailable. Baseline/post20 s, process timeout90 s, total180 s,
+temperature stop90 °C/stale6 s, без power cutoff; аварийные остановки не нужны.
+
+High-CPU subset18 polls/span34 s:
+- Package Power mean **124.898 W**, max125.101 W; без первого отсчёта17 polls
+  **124.987 W**, диапазон124.931–125.101 W. Лимит соблюдается в зарегистрированных
+  отсчётах, это не гарантия отсутствия кратковременных аппаратных выбросов.
+- Package DTS/Enhanced max **74 °C** на high-CPU участке; baseline короткого
+  Auto max79 °C, контрольного DVID -25 max80 °C. Условия воздуха не контролировались,
+  это не установившаяся длительная температура и не чистый температурный эффект.
+- P0 Clock около4.190 GHz, P0 Effective mean **4.201 GHz**;
+  E8 Clock mean3.342 GHz, E8 Effective mean **3.329 GHz**.
+- ITE Vcore mean **1.120 V**, VR VOUT mean **1.2111 V**, IA offset0.
+- PL1/PL2 в каждом high-CPU poll125/125 W. Power Limit Exceeded core/package
+  менялся0/1: ожидаемое ограничение мощности фактически наблюдается.
+  Thermal/PROCHOT=0, WHEA counter0; IA Max Turbo0/1,
+  составной RING Max VR Voltage/ICCmax/PL4=1. CEP по этим данным не установлен.
+
+Score **-4.5806%** к исходному21797.56. Сообщаемая мощность примерно на16.5%
+ниже исходного плато149.519 W. Это укладывается в предложенный рабочий ориентир
+5% потери баллов; пользователь допускает потерю в общем, жёсткий5% не задавал.
+Предложено оставить125 W как практический кандидат без дополнительного140 W
+теста: требуемая проверка завершена, исчерпывающий поиск sweet spot не нужен.
+Долговременная стабильность/прогрев и акустика этим коротким опытом не проверены.
+
+Owned HWiNFO закрыт, wrapper error=null, одноразовая задача удалена, процессов
+HWiNFO/Cinebench нет. Новый обычный PowerShell Restricted, постоянные политики
+не менялись. ZIP SHA-256 **57A49EB343E220C868F05551EC8318C656A90C374FFEED043FC0066D304BC550**
+и все22 исходных файла сверены с remote manifest. Исходные JSONL/stdout,
+preflight, qualification, анализ, CSV-экспорт из SHM и автономный report.html
+сохранены в ignored `runs/remote-access/pl125-20261023/verified/`.
+Агент аппаратные настройки не менял и новых нагрузок после опыта не запускал.
+
+### V/F и альтернативы — 23.10.2026
+
+Пользователь оценил выгодное соотношение PL125 и спросил о кривых.
+Read-only анализ F36 подтвердил VF Offset Mode Legacy/Selection и отдельные
+VF Point Offset/Prefix/Ratio с условиями доступности; детали в bios-b660-f36.md.
+Работа на установленном F20a MQ/12700F не проверена. Точечный offset не
+гарантирует устранения причины cliff прежних опытов: она всё ещё не установлена.
+
+Через search_service перепроверены первоисточники (основной web endpoint
+вернул ошибку доступа):
+- [Intel о non-K](https://www.intel.com/content/www/us/en/support/articles/000094707/processors.html),
+  редакция09.04.2026: Intel не предоставляет undervolting tools/controls для
+  locked non-K; доступные BIOS options определяет изготовитель.
+- [Intel о VF Curve в XTU](https://www.intel.com/content/www/us/en/support/articles/000093744/processors/processor-utilities-and-programs.html),
+  редакция10.04.2026: индивидуальные VF point offsets описаны отдельно от
+  убранной вкладки графика; статья не квалифицирует12700F/B660.
+- [Intel о UVP](https://www.intel.com/content/www/us/en/support/articles/000094219/processors.html),
+  редакция07.04.2026: BIOS/runtime и exposed OEM options различаются.
+- [Datasheet655258 rev011](https://cdrdv2-public.intel.com/655258/655258-011.pdf)
+  и [Package Power Control](https://edc.intel.com/content/www/us/en/design/ipla/software-development-platforms/client/platforms/alder-lake-desktop/12th-generation-intel-core-processors-datasheet-volume-1-of-2/001/package-power-control/)
+  доступны; PL1/PL2/Tau — иной механизм, чем коррекция V/F.
+
+Обсуждаемые пути: V/F point offsets; AC loadline как коррекция запроса с током
+при согласованных LLC/DC; потолки частот, если доступны; разные PL1/PL2 для
+коротких/длинных задач; отдельная fan curve для акустики. DC loadline влияет
+на учёт мощности, не использовать её для искусственного уменьшения показаний.
+Числа AC/DC профиля Power Saving неизвестны. PL125 остаётся опорой; следующие
+настройки и нагрузки не назначены и не выполнены.
+
+### Подготовка USB — 24.10.2026
+
+Официальная страница B660 DS3H DDR4 rev1.0/1.1 повторно проверена: F36
+от29.09.2026 — последняя публикация. Оригинальный32MiB файл скопирован
+на предоставленную FAT32-флешку; sync и SHA-256 после записи успешны,
+хеш совпадает с картой bios-b660-f36.md. Сам Q-Flash ещё не выполнялся.
+Перепроверены ранее приведённые официальные инструкции Q-Flash и Microsoft
+о приостановке BitLocker; состояние шифрования целевого ПК сейчас неизвестно.
+
+### Отказ OEMID — 24.10.2026
+
+Пользователь сообщил «qoemid mismatch» при попытке обновления. Вероятно
+OEMID mismatch; точный экран/этап не проверен. CIM ранее дал F20a MQ.
+Retail F36 нельзя считать совместимым только по названию платы и rev1.0.
+Гипотеза — OEM customization/identifier; изготовитель MQ неизвестен.
+Первичный пример от инженера OEM PowerSpec по другой Gigabyte-модели:
+[Micro Center](https://community.microcenter.com/discussion/16193/bios-update-for-b650m-c3-y1-g521).
+Он не доказывает совместимость или допустимость обхода на нашей плате.
+Не использовать найденные форумные force/ID bypass инструкции. Сначала
+идентифицировать производителя системы и искать штатный OEM update.
+
+### iRU — уточнение OEM
+
+24.10.2026 пользователь назвал изготовителя ПК iRU и загрузочный логотип.
+[Поиск iRU](https://iru.ru/support/driver/) принимает код товара/серийный номер.
+[FAQ BIOS](https://iru.ru/support/faq/439/) предписывает запрос в поддержку
+при отсутствии файла, с серийным номером. Проверено по официальным страницам.
+Наличие подходящего обновления для этого SKU ещё не проверено: код неизвестен.
+Пользовательская гипотеза «изменён только логотип» не подтверждена анализом.
+
+### Intel POR — 24.10.2026
+
+[Ответ Intel Support](https://community.intel.com/t5/Mobile-and-Desktop-Processors/undervolting-guides/m-p/1590399?profile.language=en)
+подтверждает POR=Plan of Record для вопроса о Gigabyte Turbo Power Limits.
+[ARK12700F](https://www.intel.com/content/www/us/en/products/sku/134592/intel-core-i712700f-processor-25m-cache-up-to-4-90-ghz/specifications.html)
+подтверждает PBP65W/MTP180W; это не измеренные значения пресета на нашем CPU.
+IFR F36 строки1091–1120: Auto0/Intel POR3/Enabled2, ручные поля при Enabled2.
+Пресет POR и ручной бюджет125/125 — альтернативные режимы. Tau/readback POR
+не проверены.
+
+### Новый baseline F36+125/125 — 24.10.2026
+
+Исходный F36+PL125/125+DVID0 завершён: **20654.59 R23 points**,49.2979s,
+одна попытка, exit0, stderr0, windows-job-empty. HWiNFO подтвердил125/125 до
+нагрузки и во всех high-CPU отсчётах. HighCPU18 уникальных polls/span34s:
+Package mean123.269W с первым переходным94W; плато17 polls **124.986W**,
+range124.917–125.066W. Package/DTS max **70C**, P0 Effective4204.92MHz,
+E8 Effective3348.28MHz. ITE Vcore1.12067V, VR VOUT1.22250V, IA offset0.
+Power-limit flags0/1; Thermal/PROCHOT0; HWiNFO WHEA counter0 в окне процесса.
+Это не отменяет сохранённые ранее boot CPER и не доказывает длительную стабильность.
+
+К прежнему F20a MQ+PL125 score20799.10 изменение **-0.6948%**; нельзя объявить
+значимым эффектом BIOS по одному прогону. Температуры70 против74C при
+неконтролируемых ambient/прогреве не являются чистым эффектом версии BIOS.
+Новая опорная точка для voltage-опытов —20654.59. Следующее предложенное
+изменение только DVID-0.025V при тех же125/125; пользователь ещё не сообщил
+его установки. Остальные настройки сохранять для сопоставимости.
+
+Архив SHA25662387D0A6C6D851D35240A2DE314D8353F066A93B36B7348527F43E9EE0FA32F
+и22 исходных файла сверены. Локальный ignored каталог
+runs/remote-access/f36-pl125-20261024/verified содержит analysis.json, исходные
+JSONL/stdout, CSV производный изSHM и автономный report.html. Owned процессы
+закрыты, одноразовая задача удалена; отдельный новый PowerShell=Restricted.
+Никакие аппаратные настройки агентом не менялись.
+
+### Карта BIOS вместо повторного DVID — 24.10.2026
+
+Создан bios-power-guide-12700f.md по извлечённому F36 и первичным Intel источникам.
+Новые проверенные элементы IFR: IA IMON slope/offset/prefix, PS thresholds/PS3/4,
+ICCmax/VR voltage limit, TDC/time/lock, IRMS; PLL overvoltage и отдельные rails.
+CEP help Gigabyte около2511 упоминает влияние на E-core performance и AC/DC;
+Auto=Disabled в help не равно аппаратному состоянию: общая форма около13404
+другой переменной имеет defaultEnabled. Visibility/callback/capability не решены.
+Intel655258 Processor Power Rails различает VCCCORE(IA+ring), VCCIN_AUX
+(вспомогательные внутренние блоки), VCC1P05_PROC(sustain), VCC1P8_PROC(PCIe PHY).
+Привязка каждого имени поля Gigabyte к физической цепи не доказана схемой.
+Новые опыты отложены до карты текущих значений и выбора механизма.

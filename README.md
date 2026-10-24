@@ -42,6 +42,7 @@ src/CpuLab.Cli -- --help`.
 - [Продолжение разговора на другом компьютере](docs/continuation.md)
 - [Журнал обсуждений и решений](docs/discussions/README.md)
 - [Единый каталог инструментов и правила транзита](docs/toolkit.md)
+- [Переносимый каталог знаний, опытов и локальный Git](docs/portable-storage.md)
 - [Подключение свежего Windows-ПК по SSH](docs/windows-remote.md)
 - [Техническое задание](docs/Codex_CPU_Lab_TZ.md)
 - [Инструкции для агентов](AGENTS.md)
