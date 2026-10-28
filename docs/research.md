@@ -1,5 +1,64 @@
 # CPU Lab: фаза 0 — техническая разведка
 
+## Дополнение 28.10.2026: Linux
+
+Практический Linux baseline28.10: Custom Compute pi1.5 млрд цифр, algorithm0
+(Chudnovsky),20 задач,verify1,ram-only,цифры не записываются. Измерено55.861 s
+Total Computation Time,58.651 s wall,exit0/Spot Check Good; профиль14-BDW/Kurumi,
+Working Memory6.61 GiB. Масштаб подходит для одного минутного сравнения.
+68 сводных отсчётов turbostat с Time_Of_Day_Seconds,59 перекрывают полный процесс:
+overlap-weighted Package mean129.667 W, max interval164.10 W, CPU max82 C guard.
+Это наблюдение на конкретной системе, не квалификация иных CPU/настроек и не
+доказательство длительной стабильности. Raw и методика агрегации — в ignored
+trial-1500m-001/analysis.json/report.html, подробности — в журнале28 октября.
+
+Уточнение после trial: [coretemp.c upstream v6.12, show_temp](https://github.com/torvalds/linux/blob/v6.12/drivers/hwmon/coretemp.c#L395)
+прочитан из официального raw-источника; условие time_after(jiffies,last_updated+HZ)
+кеширует температуру примерно на1 s. Частый sysfs polling не обеспечивает свежие
+отсчёты с той же частотой. Ветвь Debian с точными patches отдельно не разбиралась;
+наблюдавшиеся повторения значений согласуются с upstream поведением. Это
+ограничивает временное разрешение guard и интерпретацию фронта/максимума.
+
+Практическая подготовка того же дня: Linux static y-cruncher 0.8.7.9547
+получен из [официального release](https://github.com/Mysticial/y-cruncher/releases/tag/v0.8.7.9547),
+SHA-256 e22ff344f42763520d2331f19ed6177f3a7c78ac5bd462e9c060c38267181490
+совпал с digest GitHub API. Прочитаны [условия автора](https://www.numberworld.org/y-cruncher/license.html):
+бесплатное некоммерческое/академическое использование, commercial требует связи
+с автором. Вложенный Command Lines.txt подтверждает bench 25m, -TD и -od:0.
+На целевом Linux распакован Debian linux-cpupower 6.12.107-1 без системной
+установки, turbostat --version=2024.07.26. На этом этапе подготовки benchmark
+ещё не запускался, msr не был загружен; последующая проверка описана выше.
+coretemp и RAPL energy/constraints читались через sysfs, sudo требовал пароль.
+Ни исходные значения, ни hardware-specific полнота датчиков не обобщаются на
+другие машины. Ниже — первоначальная документальная разведка до подготовки.
+
+Статус таблицы ниже — **DOC**, первоначальная разведка до практической проверки.
+Она не подтверждает аппаратную доступность функций. Результат последующего
+запуска выбранной пары и её версии приведены выше.
+
+| Инструмент / первоисточник | Интерфейс и назначение | Версия / лицензия / ограничения |
+|---|---|---|
+| [stress-ng](https://github.com/ColinIanKing/stress-ng), [manual](https://github.com/ColinIanKing/stress-ng/blob/master/stress-ng.1) | CLI, отдельные CPU/memory стрессоры, timeout, metrics, verify для поддерживающих проверку тестов | Проверена документация master без фиксации commit; GPL-2.0. Автор не считает bogo ops точным benchmark. Timeout может превышаться при cleanup/блокировке, нужен независимый supervisor |
+| [y-cruncher](https://www.numberworld.org/y-cruncher/) | Linux и Windows, вычислительные benchmark/stress tests | Страница указывает 0.8.7 build 9547 для обеих ОС. Собственная лицензия: условия конкретного Linux-пакета заново не читались; распространение не квалифицировано. CLI stress-профиль и CPU dispatch проверить на выбранной сборке |
+| [7-Zip](https://www.7-zip.org/download.html), [лицензия](https://www.7-zip.org/license.txt) | Нативный Linux console; кандидат benchmark `7zz b` с фиксированными потоками/словарём | На странице 26.05 от 21.10.2026, ранее исследовалась 26.04; новая сборка не квалифицирована. LGPL с отдельными BSD/unRAR условиями для частей. Это не эквивалент R23 |
+| [turbostat](https://github.com/torvalds/linux/blob/master/tools/power/x86/turbostat/turbostat.8) | CLI, периодический текстовый вывод; Busy%, Avg_MHz, Bzy_MHz, температуры, RAPL мощность по доступности | Документация Linux master, установленная версия неизвестна; GPL-2.0-only по заголовку man page. Набор полей зависит от CPU/ядра/прав. Слишком короткие интервалы дают несогласованные выборки. Не обещать универсальную доступность perf-limit причин |
+| [coretemp](https://docs.kernel.org/next/hwmon/coretemp.html), [hwmon](https://github.com/torvalds/linux/blob/master/Documentation/hwmon/sysfs-interface.rst), [lm-sensors](https://github.com/lm-sensors/lm-sensors) | Температуры DTS core/package и доступные датчики платы через sysfs/sensors | Версии целевого ядра/пакетов неизвестны. Kernel GPL-2.0; lm-sensors: GPL/LGPL по компонентам, точные условия выбранного пакета проверить перед упаковкой. VR VOUT/Vcore/вентиляторы зависят от драйвера и платы; неизвестные inN не выдавать за Vcore |
+| [powercap/RAPL](https://docs.kernel.org/power/powercap/powercap.html) | sysfs energy_uj, max_energy_range_uj, имена зон и ограничений; средняя мощность из delta энергии / delta времени | Часть ядра; версия целевой системы неизвестна. Учесть переполнение счётчика. Это оценка энергии домена CPU, не потребление ПК из розетки; ограничения только читать |
+| [OCCT Enterprise](https://www.ocbase.com/occt/enterprise) | Windows/Linux, offline deployment, CLI, экспорт JSON/CSV/PDF и offline HTML comparison | Proprietary/commercial; версия бинарника и соответствие Linux-функций не квалифицированы, права зависят от редакции |
+
+Рекомендация: turbostat как основной Intel источник с интервалом порядка 1 s,
+hwmon/RAPL как дополнительные источники; stress-ng для контролируемой нагрузки,
+y-cruncher для вычислительной проверки, фиксированный benchmark для оценки
+эффективности. Это предложение, не согласованный запуск. Не запускать весь
+нагрузочный процесс с root только потому, что монитор требует дополнительных прав.
+
+Avg_MHz учитывает idle, Bzy_MHz относится к занятому времени, Busy% — занятость;
+не приравнивать их автоматически к HWiNFO Effective Clock. Для гипотезы clock
+stretching сопоставлять счётчики, занятость и выполненную работу; падение результата
+само по себе не доказывает CEP. На hybrid CPU раздельно учитывать P/E и SMT.
+Для сравнения ОС фиксировать версии/профили/ISA, ядро, микрокод и политику частот.
+Реализация Linux TelemetryProvider и новых BenchmarkAdapter здесь не выполнялась.
+
 Дата проверки: **20 октября 2026**. Основание: [ТЗ](Codex_CPU_Lab_TZ.md).
 Статус: изучены первоисточники и исходный код; **реализация не начата**.
 
